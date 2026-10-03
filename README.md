@@ -125,3 +125,5 @@ docker compose -f docker-compose.prod.yml up -d --build
 | :-------------- | :------------------------ | :------------------------------------------------ | :------------------------ |
 | **Development** | `docker-compose.dev.yml`  | `docker compose -f docker-compose.dev.yml up`     | `neon-local:5432` (Proxy) |
 | **Production**  | `docker-compose.prod.yml` | `docker compose -f docker-compose.prod.yml up -d` | Neon Cloud DB Host        |
+
+## TESTING CI/CD PIPELINES
