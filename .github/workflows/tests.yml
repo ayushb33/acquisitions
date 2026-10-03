@@ -1,0 +1,95 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+  pull_request:
+    branches:
+      - main
+      - staging
+
+jobs:
+  test:
+    name: Run Tests & Coverage
+    runs-on: ubuntu-latest
+
+    env:
+      NODE_ENV: test
+      NODE_OPTIONS: --experimental-vm-modules
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── Run Tests ────────────────────────────────────────────────────────────
+      - name: Run tests with coverage
+        id: tests
+        run: npm test -- --coverage --coverageReporters=text --coverageReporters=lcov --coverageReporters=json-summary
+        continue-on-error: true
+
+      # ── Coverage Artifact ────────────────────────────────────────────────────
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 30
+
+      # ── GitHub Step Summary ──────────────────────────────────────────────────
+      - name: Generate test summary
+        if: always()
+        run: |
+          SUMMARY_FILE="${{ github.step_summary }}"
+
+          echo "## 🧪 Test Results" >> "$SUMMARY_FILE"
+          echo "" >> "$SUMMARY_FILE"
+
+          if [ "${{ steps.tests.outcome }}" == "success" ]; then
+            echo "### ✅ All tests passed" >> "$SUMMARY_FILE"
+          else
+            echo "### ❌ Tests failed" >> "$SUMMARY_FILE"
+          fi
+
+          echo "" >> "$SUMMARY_FILE"
+
+          # Append coverage summary if the JSON summary file exists
+          if [ -f coverage/coverage-summary.json ]; then
+            LINES=$(node -e "
+              const s = require('./coverage/coverage-summary.json').total;
+              console.log([
+                '| Metric      | Coverage |',
+                '|-------------|----------|',
+                \`| Statements  | \${s.statements.pct}% (\${s.statements.covered}/\${s.statements.total}) |\`,
+                \`| Branches    | \${s.branches.pct}% (\${s.branches.covered}/\${s.branches.total}) |\`,
+                \`| Functions   | \${s.functions.pct}% (\${s.functions.covered}/\${s.functions.total}) |\`,
+                \`| Lines       | \${s.lines.pct}% (\${s.lines.covered}/\${s.lines.total}) |\`,
+              ].join('\n'));
+            ")
+            echo "### 📊 Coverage Report" >> "$SUMMARY_FILE"
+            echo "" >> "$SUMMARY_FILE"
+            echo "$LINES" >> "$SUMMARY_FILE"
+          else
+            echo "⚠️ Coverage summary not available." >> "$SUMMARY_FILE"
+          fi
+
+      # ── Fail Annotation ──────────────────────────────────────────────────────
+      - name: Annotate test failures
+        if: steps.tests.outcome == 'failure'
+        run: |
+          echo "::error title=Tests failed::One or more tests did not pass. \
+          Review the test output above and the uploaded coverage artifact for details. \
+          Fix the failing tests and push again."
+          exit 1
