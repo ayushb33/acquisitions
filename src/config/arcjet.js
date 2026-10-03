@@ -5,7 +5,7 @@ const aj = arcjet({
   rules: [
     shield({ mode: 'LIVE' }),
     detectBot({
-      mode: 'LIVE',
+      mode: 'DRY_RUN',
       allow: ['CATEGORY:SEARCH_ENGINE', 'CATEGORY:PREVIEW'],
     }),
     slidingWindow({
